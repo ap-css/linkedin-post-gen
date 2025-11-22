@@ -21,7 +21,9 @@ if not GROQ_API_KEY:
     )
 
 # Default model name — change this to a model you definitely have access to if needed.
-MODEL_NAME = os.getenv("GROQ_MODEL_NAME", "deepseek-r1-distill-llama-70b")
+# use a guaranteed-access Groq model for testing
+MODEL_NAME = os.getenv("GROQ_MODEL_NAME", "groq/compound-mini")
+
 
 logger.info("Initializing Groq client with model: %s", MODEL_NAME)
 

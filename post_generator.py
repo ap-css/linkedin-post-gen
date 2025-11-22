@@ -48,7 +48,41 @@ If Language is Hinglish, use English script with Hindi-English mix.
         for i, post in enumerate(examples[:2]):
             prompt += f"\n\nExample {i+1}:\n{post['text']}"
 
-    response = llm.invoke(prompt)
+    # --- paste this in place of `response = llm.invoke(prompt)` ---
+    import logging, groq
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+    # log prompt length (helps debug size / limit issues)
+    try:
+        logger.info("Sending prompt of length: %d chars", len(prompt))
+    except Exception:
+        logger.info("Sending prompt (length unknown)")
+
+    # Safety check: avoid extremely long prompts being sent unintentionally
+    MAX_PROMPT_CHARS = 40000
+    if isinstance(prompt, str) and len(prompt) > MAX_PROMPT_CHARS:
+        logger.warning("Prompt length %d exceeds %d — truncating.", len(prompt), MAX_PROMPT_CHARS)
+        # a conservative truncation that preserves the beginning of the prompt
+        prompt = prompt[:MAX_PROMPT_CHARS]
+
+    try:
+        response = llm.invoke(prompt)
+    except groq.BadRequestError as e:
+        # Try to extract raw HTTP response to find the real cause (model not found, prompt too long, invalid params, etc.)
+        try:
+            raw = getattr(e, "response", None)
+            status = getattr(raw, "status_code", "<no status>")
+            body = getattr(raw, "text", None) or getattr(raw, "data", None) or "<no body>"
+            logger.error("Groq BadRequestError status=%s body=%s", status, body)
+        except Exception as inner:
+            logger.exception("Failed to extract raw response from Groq error: %s", inner)
+        # Re-raise so upstream can handle (and so Streamlit shows the error)
+        raise
+    except Exception as e:
+        logger.exception("Unexpected error calling llm.invoke: %s", e)
+        raise
+
     full_output = response.content.strip()
 
     if "</think>" in full_output:
